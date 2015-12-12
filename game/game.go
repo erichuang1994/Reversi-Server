@@ -18,17 +18,20 @@ type Game struct {
 	leisure  bool
 	Name     string
 	ready    [2]bool
+	watcher  *User
 }
 
 func (g *Game) Restart() {
-	for i := 0; i < 8; i++ {
-		for j := 0; j < 8; j++ {
-			g.state[i][j] = -1
-		}
-	}
+	// for i := 0; i < 8; i++ {
+	// for j := 0; j < 8; j++ {
+	// g.state[i][j] = -1
+	// }
+	// }
 	g.turn = 0
-	g.player[0], g.player[1] = nil, nil
+	var temp [][2]int
+	g.stepList = temp
 }
+
 func (g *Game) Status() bool {
 	return g.leisure
 }
@@ -54,7 +57,7 @@ func (g *Game) Move(x int, y int) *User {
 	// 把这一步记录下来
 	g.stepList = append(g.stepList, [2]int{x, y})
 	// 走这一步
-	g.state[x][y] = g.turn
+	// g.state[x][y] = g.turn
 	// 逻辑处理
 	// 轮到下一个人
 	g.turn = (g.turn + 1) % 2
@@ -63,6 +66,7 @@ func (g *Game) Move(x int, y int) *User {
 
 func (g *Game) Join(someone *User) bool {
 	if g.player[0] != nil && g.player[1] != nil {
+		// 人满不能加了
 		return false
 	}
 	if g.player[0] == nil {
@@ -88,4 +92,44 @@ func (g *Game) Ready(someone *User) (*User, *User, bool) {
 		return g.player[0], g.player[1], true
 	}
 	return nil, nil, false
+}
+
+// 将user的GameName清掉
+func (g *Game) Close() {
+	for index, user := range g.player {
+		if user != nil {
+			user.GameName = ""
+			g.player[index] = nil
+		}
+	}
+}
+
+func (g *Game) Steps() [][2]int {
+	return g.stepList
+}
+
+func (g *Game) SetWatcher(user *User) {
+	g.watcher = user
+}
+
+func (g *Game) Watch() (*User, bool) {
+	if g.watcher != nil {
+		return g.watcher, true
+	}
+	return nil, false
+}
+
+// 如果是玩家退出返回另一个玩家与true
+func (g *Game) Leave(someone *User) (*User, bool) {
+	if g.watcher == someone {
+		g.watcher = nil
+		return nil, false
+	}
+	for index, user := range g.player {
+		if user == someone {
+			g.player[index] = nil
+			return g.player[(index+1)%2], true
+		}
+	}
+	return nil, false
 }

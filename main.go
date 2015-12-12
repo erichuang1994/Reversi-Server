@@ -45,7 +45,7 @@ func conHandler(conn *net.UDPConn, addr *net.UDPAddr, msg []byte, length int) {
 	case "WATCH":
 		Watch(conn, addr, com[1:])
 	case "CLOSEGAME":
-		Closegame(conn, addr, com[1:])
+		CloseGame(conn, addr, com[1:])
 	case "JOIN":
 		Join(conn, addr, com[1:])
 	case "MOVE":

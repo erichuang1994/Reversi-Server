@@ -64,6 +64,8 @@ func Login(conn *net.UDPConn, addr *net.UDPAddr, msg []string) {
 	}
 	if len(msg) == 2 && msg[0] == admin && msg[1] == password {
 		rootToken = genToken(admin)
+		temp := User{Username: msg[0], Addr: addr, LastModified: unixTime()}
+		userList[rootToken] = &temp
 		conn.WriteToUDP([]byte(rootToken), addr)
 		return
 	}
@@ -194,6 +196,43 @@ func OpenGame(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 			gameList[cmd[0]] = &newGame
 			conn.WriteToUDP([]byte("200"), addr)
 		}
+	}
+}
+
+func Watch(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
+	if cmd[1] == rootToken {
+		game, _ := gameList[cmd[0]]
+		root, _ := userList[cmd[1]]
+		game.SetWatcher(root)
+		steps := game.Steps()
+		var buffer bytes.Buffer
+		for i := 0; i < len(steps); i++ {
+			buffer.WriteString(fmt.Sprintf("(%d,%d)", steps[i][0], steps[i][1]))
+		}
+		conn.WriteToUDP(buffer.Bytes(), root.Addr)
+		root.GameName = cmd[0]
+	}
+}
+
+func Leave(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
+	user, ok := userList[cmd[1]]
+	if ok {
+		game, _ := gameList[user.GameName]
+		another, ok := game.Leave(user)
+		if ok {
+			conn.WriteToUDP([]byte("LEAVE"), another.Addr)
+		}
+	}
+}
+
+func CloseGame(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
+	if cmd[1] == rootToken {
+		game, _ := gameList[cmd[0]]
+		user1, user2 := game.Player()
+		game.Close()
+		conn.WriteToUDP([]byte("CLOSE"), user1.Addr)
+		conn.WriteToUDP([]byte("CLOSE"), user2.Addr)
+		delete(gameList, cmd[0])
 	}
 }
 

@@ -76,7 +76,10 @@ func Msg(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 func Kickout(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if cmd[1] == rootToken {
 		user := userList[cmd[0]]
-		gameList[user.GameName].Kickout(user)
+		game, ok := gameList[user.GameName]
+		if ok {
+			game.Kickout(user)
+		}
 	}
 }
 func Login(conn *net.UDPConn, addr *net.UDPAddr, msg []string) {
@@ -154,11 +157,11 @@ func Join(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if ok {
 		game, _ := gameList[cmd[0]]
 		if game.Join(user) {
-			conn.WriteToUDP([]byte("JOIN Success"), addr)
+			conn.WriteToUDP([]byte("JOIN SUCCESS"), addr)
 			return
 		}
 	}
-	conn.WriteToUDP([]byte("JOIN Fail"), addr)
+	conn.WriteToUDP([]byte("JOIN FAIL"), addr)
 
 }
 
@@ -166,24 +169,45 @@ func Join(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 func Ready(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	user, ok := userList[cmd[0]]
 	if ok {
-		user1, user2, ok := gameList[cmd[0]].Ready(user)
-		conn.WriteToUDP([]byte("READY SUCCESS"), userListByusername[user1.Username].Addr)
+		game, gameok := gameList[user.GameName]
+		if !gameok {
+			conn.WriteToUDP([]byte("READY FAIL"), addr)
+		}
+		user1, user2, ok := game.Ready(user)
+		conn.WriteToUDP([]byte("READY SUCCESS"), addr)
 		if ok {
-			conn.WriteToUDP([]byte("START black"), userListByusername[user1.Username].Addr)
-			conn.WriteToUDP([]byte("START white"), userListByusername[user2.Username].Addr)
+			conn.WriteToUDP([]byte("START BLACK"), userListByusername[user1.Username].Addr)
+			conn.WriteToUDP([]byte("START WHITE"), userListByusername[user2.Username].Addr)
+			conn.WriteToUDP([]byte("YOURTURN"), userListByusername[user1.Username].Addr)
 		}
 	}
 }
 
 // Move x y移动完应该通知另一位玩家
 func Move(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
-	_, ok1 := userList[cmd[3]]
+	_, ok1 := userList[cmd[4]]
 	game, ok2 := gameList[cmd[0]]
 	if ok1 && ok2 {
 		x, _ := strconv.Atoi(cmd[1])
 		y, _ := strconv.Atoi(cmd[2])
-		user := game.Move(x, y)
-		conn.WriteToUDP([]byte(fmt.Sprintf("MOVE %d %d", x, y)), user.Addr)
+		user1, user2, watcher, over := game.Move(x, y)
+
+		conn.WriteToUDP([]byte(fmt.Sprintf("MOVE %d %d %s", x, y, cmd[3])), user1.Addr)
+		conn.WriteToUDP([]byte(fmt.Sprintf("MOVE %d %d %s", x, y, cmd[3])), user2.Addr)
+		if watcher != nil {
+			conn.WriteToUDP([]byte(fmt.Sprintf("MOVE %d %d %s", x, y, cmd[3])), watcher.Addr)
+		}
+		if over == false {
+			// 向下一个走棋的人发指令
+			conn.WriteToUDP([]byte("YOURTURN"), game.Turn().Addr)
+		} else { //此时游戏结束 user1为获胜者
+			msg := fmt.Sprintf("GAMEOVER %s defeat %s", user1.Username, user2.Username)
+			conn.WriteToUDP([]byte(msg), user1.Addr)
+			conn.WriteToUDP([]byte(msg), user2.Addr)
+			if watcher != nil {
+				conn.WriteToUDP([]byte(msg), watcher.Addr)
+			}
+		}
 	}
 }
 
@@ -240,6 +264,9 @@ func Watch(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if cmd[1] == rootToken {
 		game, _ := gameList[cmd[0]]
 		root, _ := userList[cmd[1]]
+		if game.Status() != false { //游戏还没开始不能观战
+			conn.WriteToUDP([]byte("WATCH FAIL"), root.Addr)
+		}
 		game.SetWatcher(root)
 		steps := game.Steps()
 		var buffer bytes.Buffer

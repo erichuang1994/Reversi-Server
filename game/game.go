@@ -21,6 +21,10 @@ type Game struct {
 	watcher  *User
 }
 
+func (g *Game) Init() {
+	g.leisure = true
+}
+
 func (g *Game) Restart() {
 	// for i := 0; i < 8; i++ {
 	// for j := 0; j < 8; j++ {
@@ -42,6 +46,9 @@ func (g *Game) Kickout(someone *User) {
 		if user == someone {
 			g.player[index] = nil
 		}
+	}
+	if g.leisure == false {
+		g.leisure = true
 	}
 }
 func (g *Game) Turn() int {
@@ -65,7 +72,7 @@ func (g *Game) Move(x int, y int) *User {
 }
 
 func (g *Game) Join(someone *User) bool {
-	if g.player[0] != nil && g.player[1] != nil {
+	if g.leisure == false {
 		// 人满不能加了
 		return false
 	}
@@ -73,6 +80,9 @@ func (g *Game) Join(someone *User) bool {
 		g.player[0] = someone
 	} else {
 		g.player[1] = someone
+	}
+	if g.player[0] != nil && g.player[1] != nil {
+		g.leisure = false
 	}
 	someone.GameName = g.Name
 	return true

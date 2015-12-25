@@ -9,20 +9,42 @@ import (
 	"net"
 	. "reversi/game"
 	"strconv"
+	"strings"
 	"time"
 )
 
 var (
-	userList           map[string]*User
-	userListByusername map[string]*User
-	gameList           map[string]*Game
+	userList           = make(map[string]*User)
+	userListByusername = make(map[string]*User)
+	gameList           = make(map[string]*Game)
 	rootToken          string
-	playList           map[string]*Game
-	restartMap         map[string]chan int
+	restartMap         = make(map[string]chan int)
 )
 
 const admin = "root"
 const password = "root"
+
+/////////////////////////////
+//Token generator          //
+//current use sha1:)foreasy//
+//1/12/2015                //
+/////////////////////////////
+func init() {
+	newGame := Game{Name: "yutang"}
+	newGame.Init()
+	gameList["yutang"] = &newGame
+}
+
+//send  heartBeat package
+func HeartBeat(conn *net.UDPConn) {
+	for {
+		time.Sleep(time.Second * 120)
+
+		for token, user := range userList {
+			Ping(conn, user, token)
+		}
+	}
+}
 
 /////////////////////////////
 //Token generator          //
@@ -58,25 +80,28 @@ func Kickout(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	}
 }
 func Login(conn *net.UDPConn, addr *net.UDPAddr, msg []string) {
-	fmt.Printf("com:%v\n", msg)
+	fmt.Printf("command:%v len:%d\n", msg, len(msg))
+	var resp string
 	if msg[0] == admin {
 		fmt.Println("user root")
 	}
-	if len(msg) == 2 && msg[0] == admin && msg[1] == password {
-		rootToken = genToken(admin)
-		temp := User{Username: msg[0], Addr: addr, LastModified: unixTime()}
-		userList[rootToken] = &temp
-		conn.WriteToUDP([]byte(rootToken), addr)
+	if len(msg) == 2 {
+		if msg[0] == admin && msg[1] == password {
+			rootToken = genToken(admin)
+			temp := User{Username: msg[0], Addr: addr, LastModified: unixTime()}
+			userList[rootToken] = &temp
+			resp = "ROOT " + rootToken
+		} else {
+			resp = "LOGIN FAILED "
+		}
+		conn.WriteToUDP([]byte(resp), addr)
 		return
 	}
 	if len(msg) == 1 {
 		token := genToken(msg[0])
 		_, ok := userList[token]
-		var resp string
-		if ok {
-			// 用户已经登录或者重复登录
-			resp = token
-		} else {
+		resp = "LOGIN SUCCESS " + token
+		if !ok {
 			temp := User{Username: msg[0], Addr: addr, LastModified: unixTime()}
 			userList[token] = &temp
 			userListByusername[msg[0]] = &temp
@@ -88,19 +113,28 @@ func Login(conn *net.UDPConn, addr *net.UDPAddr, msg []string) {
 func Games(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if _, ok := userList[cmd[0]]; ok {
 		var buffer bytes.Buffer
-		for key := range playList {
-			buffer.WriteString(key)
-			buffer.WriteString(" ")
+		temp := []string{"GAMES"}
+		for key, item := range gameList {
+			temp = append(temp, key)
+			if item.Status() {
+				temp = append(temp, "free")
+			} else {
+				temp = append(temp, "busy")
+			}
 		}
+
+		buffer.WriteString(strings.Join(temp, " "))
+		fmt.Printf("GAMES %v", strings.Join(temp, " "))
 		conn.WriteToUDP(buffer.Bytes(), addr)
 	}
 }
 
 // 输出格式
-// username free(room:gameName) \n
+// LIST username free(room:gameName)
 func List(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if _, ok := userList[cmd[0]]; ok {
 		var buffer bytes.Buffer
+		buffer.WriteString("LIST ")
 		for _, user := range userList {
 			buffer.WriteString(user.Username)
 			buffer.WriteString(" ")
@@ -109,7 +143,7 @@ func List(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 			} else {
 				buffer.WriteString("room:" + user.GameName)
 			}
-			buffer.WriteString("\n")
+			buffer.WriteString(" ")
 		}
 		conn.WriteToUDP(buffer.Bytes(), addr)
 	}
@@ -118,23 +152,25 @@ func List(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 func Join(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	user, ok := userList[cmd[1]]
 	if ok {
-		game, _ := gameList[user.GameName]
+		game, _ := gameList[cmd[0]]
 		if game.Join(user) {
-			conn.WriteToUDP([]byte("Success"), addr)
+			conn.WriteToUDP([]byte("JOIN Success"), addr)
+			return
 		}
-	} else {
-		conn.WriteToUDP([]byte("Fail"), addr)
 	}
+	conn.WriteToUDP([]byte("JOIN Fail"), addr)
+
 }
 
 // 当两个玩家都准备的时候发送START让游戏开始
 func Ready(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
-	user, ok := userList[cmd[1]]
+	user, ok := userList[cmd[0]]
 	if ok {
 		user1, user2, ok := gameList[cmd[0]].Ready(user)
+		conn.WriteToUDP([]byte("READY SUCCESS"), userListByusername[user1.Username].Addr)
 		if ok {
-			conn.WriteToUDP([]byte("START"), userListByusername[user1.Username].Addr)
-			conn.WriteToUDP([]byte("START"), userListByusername[user2.Username].Addr)
+			conn.WriteToUDP([]byte("START black"), userListByusername[user1.Username].Addr)
+			conn.WriteToUDP([]byte("START white"), userListByusername[user2.Username].Addr)
 		}
 	}
 }
@@ -190,11 +226,12 @@ func OpenGame(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if cmd[1] == rootToken {
 		if _, ok := gameList[cmd[0]]; ok {
 			// 该名字命名的游戏已经存在
-			conn.WriteToUDP([]byte("403"), addr)
+			conn.WriteToUDP([]byte("OPENGAME FAIL"), addr)
 		} else {
 			newGame := Game{Name: cmd[0]}
+			newGame.Init()
 			gameList[cmd[0]] = &newGame
-			conn.WriteToUDP([]byte("200"), addr)
+			conn.WriteToUDP([]byte("OPENGAME SUCCESS"), addr)
 		}
 	}
 }
@@ -230,9 +267,14 @@ func CloseGame(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 		game, _ := gameList[cmd[0]]
 		user1, user2 := game.Player()
 		game.Close()
-		conn.WriteToUDP([]byte("CLOSE"), user1.Addr)
-		conn.WriteToUDP([]byte("CLOSE"), user2.Addr)
 		delete(gameList, cmd[0])
+		if user1 != nil {
+			conn.WriteToUDP([]byte("CLOSE"), user1.Addr)
+		}
+		if user2 != nil {
+			conn.WriteToUDP([]byte("CLOSE"), user2.Addr)
+		}
+		conn.WriteToUDP([]byte("CLOSE "+cmd[0]+" SUCCESS"), addr)
 	}
 }
 
@@ -241,11 +283,24 @@ func CloseGame(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 //client should return pong           //
 //then server update user.lastModified//
 ////////////////////////////////////////
-func Ping(conn *net.UDPConn, user User) bool {
+func Ping(conn *net.UDPConn, user *User, token string) bool {
 	conn.WriteToUDP([]byte("PING"), user.Addr)
 	time.Sleep(time.Second)
 	if unixTime()-user.LastModified > 2 {
+		// 清除不在线用户
+		game, ok := gameList[user.GameName]
+		if ok {
+			game.Kickout(user)
+		}
+		delete(userList, token)
 		return false
 	}
 	return true
+}
+
+func Pong(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
+	user, ok := userList[cmd[0]]
+	if ok {
+		user.LastModified = unixTime()
+	}
 }

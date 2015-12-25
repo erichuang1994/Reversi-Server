@@ -25,7 +25,7 @@ func unixTime() int64 {
 //////////////
 func conHandler(conn *net.UDPConn, addr *net.UDPAddr, msg []byte, length int) {
 	com := strings.Split(string(msg[0:length]), " ")
-	fmt.Printf("receive from :%v\nmeg:%s\n", addr, msg)
+	fmt.Printf("receive from :%v\nmessage:%s\n", addr, msg)
 	if len(com) < 2 {
 		return
 	}
@@ -58,7 +58,10 @@ func conHandler(conn *net.UDPConn, addr *net.UDPAddr, msg []byte, length int) {
 		Leave(conn, addr, com[1:])
 	case "READY":
 		Ready(conn, addr, com[1:])
+	case "PONG":
+		Pong(conn, addr, com[1:])
 	}
+
 }
 
 func main() {
@@ -69,6 +72,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("ListenUDP err:%v\n", err)
 	}
+	go HeartBeat(conn)
 	for {
 		msg := make([]byte, 1024)
 		length, addr, err := conn.ReadFromUDP(msg)

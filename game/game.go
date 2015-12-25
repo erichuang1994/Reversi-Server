@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"net"
+	"strconv"
 )
 
 type User struct {
@@ -259,6 +260,19 @@ func (g *Game) showGame() {
 	fmt.Printf("%v\n", g.board)
 }
 
+func (g *Game) GetBoardStr() string {
+	str := ""
+	for x := 0; x < 8; x++ {
+		for y := 0; y < 8; y++ {
+			if g.board[x][y] == -1 {
+				str += "3"
+			} else {
+				str += strconv.Itoa(g.board[x][y])
+			}
+		}
+	}
+	return str
+}
 func init() {
 	test := Game{Name: "fuck"}
 	test.Init()

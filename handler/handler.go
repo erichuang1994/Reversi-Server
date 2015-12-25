@@ -61,24 +61,38 @@ func unixTime() int64 {
 
 func Msg(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if len(cmd) == 3 && cmd[2] == rootToken {
-		user, _ := userList[cmd[0]]
 
-		conn.WriteToUDP([]byte(cmd[1]), user.Addr)
+		user, ok := userListByusername[cmd[0]]
+
+		if ok == true {
+			conn.WriteToUDP([]byte("MSG "+cmd[1]), user.Addr)
+		}
 	} else if len(cmd) == 2 && cmd[1] == rootToken {
 		var buffer bytes.Buffer
 		buffer.WriteString("MSG " + cmd[0])
 		for _, user := range userList {
-			conn.WriteToUDP(buffer.Bytes(), user.Addr)
+			if user.Username != "root" {
+				conn.WriteToUDP(buffer.Bytes(), user.Addr)
+			}
 		}
 	}
 }
 
 func Kickout(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if cmd[1] == rootToken {
-		user := userList[cmd[0]]
+		user := userListByusername[cmd[0]]
+		fmt.Printf("GAMENAME:%s", user.GameName)
 		game, ok := gameList[user.GameName]
+		user1, user2 := game.Player()
 		if ok {
 			game.Kickout(user)
+			ret := []byte("KICKOUT " + user.Username)
+			if user1 != nil {
+				conn.WriteToUDP(ret, user1.Addr)
+			}
+			if user2 != nil {
+				conn.WriteToUDP(ret, user2.Addr)
+			}
 		}
 	}
 }
@@ -268,12 +282,8 @@ func Watch(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 			conn.WriteToUDP([]byte("WATCH FAIL"), root.Addr)
 		}
 		game.SetWatcher(root)
-		steps := game.Steps()
-		var buffer bytes.Buffer
-		for i := 0; i < len(steps); i++ {
-			buffer.WriteString(fmt.Sprintf("(%d,%d)", steps[i][0], steps[i][1]))
-		}
-		conn.WriteToUDP(buffer.Bytes(), root.Addr)
+		boardstr := game.GetBoardStr()
+		conn.WriteToUDP([]byte("WATCH SUCCESS "+boardstr), root.Addr)
 		root.GameName = cmd[0]
 	}
 }
@@ -283,8 +293,8 @@ func Leave(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if ok {
 		game, _ := gameList[user.GameName]
 		another, ok := game.Leave(user)
-		if ok {
-			conn.WriteToUDP([]byte("LEAVE"), another.Addr)
+		if ok && another != nil {
+			conn.WriteToUDP([]byte("LEAVE "+user.Username), another.Addr)
 		}
 	}
 }

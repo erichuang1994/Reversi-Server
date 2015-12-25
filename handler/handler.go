@@ -226,25 +226,45 @@ func Move(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 }
 
 func Restart(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
+	if len(cmd) != 1 { //restart失败
+		user, ok := userList[cmd[0]]
+		if !ok {
+			return
+		}
+		game, ok2 := gameList[user.GameName]
+		if !ok2 {
+			return
+		}
+		game.ResetRestartFlag()
+		return
+	}
 	user, ok := userList[cmd[0]]
 	if ok {
-		user1, user2 := gameList[user.GameName].Player()
-		var another *User
-		if user1 == user {
-			another = user2
-		} else {
-			another = user1
+		game, ok2 := gameList[user.GameName]
+		if !ok2 {
+			return
 		}
-		restartMap[user.GameName] = make(chan int)
+		key := game.SetRestartFlag(user)
+		user1, user2 := game.Player()
+		if key == true {
+			conn.WriteToUDP([]byte("RESTART SUCCESS"), user1.Addr)
+			conn.WriteToUDP([]byte("RESTART SUCCESS"), user2.Addr)
+			user1, user2, ok := game.Ready(user)
+			game.Restart()
+			if ok {
+				conn.WriteToUDP([]byte("START BLACK"), userListByusername[user1.Username].Addr)
+				conn.WriteToUDP([]byte("START WHITE"), userListByusername[user2.Username].Addr)
+				conn.WriteToUDP([]byte("YOURTURN"), userListByusername[user1.Username].Addr)
+			}
+			return
+		}
 		// 询问另一个玩家
-		conn.WriteToUDP([]byte("RESTART"), another.Addr)
-		ok := <-restartMap[user.GameName]
-		if ok == 1 {
-			conn.WriteToUDP([]byte("OK"), addr)
-		} else {
-			conn.WriteToUDP([]byte("NO"), addr)
+		if user1 != nil && user1 != user {
+			conn.WriteToUDP([]byte("RESTART REQUEST"), user1.Addr)
 		}
-		delete(restartMap, user.GameName)
+		if user2 != nil && user2 != user {
+			conn.WriteToUDP([]byte("RESTART REQUEST"), user2.Addr)
+		}
 	}
 }
 

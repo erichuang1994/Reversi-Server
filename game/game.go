@@ -15,9 +15,9 @@ type User struct {
 }
 
 type Game struct {
-	board     [8][8]int // -1为空 0 为黑子 1 为白子
-	player    [2]*User  //user0为黑方 user1为白方
-	stepList  [][2]int
+	board  [8][8]int // -1为空 0 为黑子 1 为白子
+	player [2]*User  //user0为黑方 user1为白方
+
 	turn      int
 	leisure   bool
 	Name      string
@@ -26,6 +26,7 @@ type Game struct {
 	direction [8][2]int
 	black     int
 	white     int
+	restart   [2]bool
 }
 
 func (g *Game) Init() {
@@ -43,6 +44,7 @@ func (g *Game) Init() {
 	g.board[3][3], g.board[4][4] = g.black, g.black
 	g.board[3][4], g.board[4][3] = g.white, g.white
 	g.watcher = nil
+	g.restart[0], g.restart[1] = false, false
 }
 
 func (g *Game) Restart() {
@@ -54,8 +56,7 @@ func (g *Game) Restart() {
 	g.board[3][3], g.board[4][4] = g.black, g.black
 	g.board[3][4], g.board[4][3] = g.white, g.white
 	g.turn = 0
-	var temp [][2]int
-	g.stepList = temp
+	g.restart[0], g.restart[1] = false, false
 }
 
 func (g *Game) Status() bool {
@@ -86,8 +87,6 @@ func (g *Game) Player() (*User, *User) {
 // 第二个参数的败者
 // 第三个返回值通常也为nil,当存在观战的人的时候返回观战的人的*User
 func (g *Game) Move(x int, y int) (*User, *User, *User, bool) {
-	// 把这一步记录下来
-	g.stepList = append(g.stepList, [2]int{x, y})
 	// 走这一步
 	turn := g.turn
 	g.board[x][y] = turn
@@ -214,10 +213,6 @@ func (g *Game) Close() {
 	}
 }
 
-func (g *Game) Steps() [][2]int {
-	return g.stepList
-}
-
 func (g *Game) SetWatcher(user *User) {
 	g.watcher = user
 }
@@ -272,6 +267,22 @@ func (g *Game) GetBoardStr() string {
 		}
 	}
 	return str
+}
+
+func (g *Game) SetRestartFlag(user *User) bool {
+	for index, item := range g.player {
+		if item == user {
+			g.restart[index] = true
+		}
+	}
+	if g.restart[0] && g.restart[1] {
+		return true
+	}
+	return false
+}
+
+func (g *Game) ResetRestartFlag() {
+	g.restart[0], g.restart[1] = false, false
 }
 func init() {
 	test := Game{Name: "fuck"}

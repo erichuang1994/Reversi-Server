@@ -142,7 +142,7 @@ func (g *Game) testMove(x int, y int, turn int) bool {
 	if !(0 <= x && x < 8 && 0 <= y && y < 8) || g.board[x][y] != -1 {
 		return false
 	}
-	fmt.Printf("test move %d %d\n", x, y)
+	// fmt.Printf("test move %d %d\n", x, y)
 	for i := 0; i < len(g.direction); i++ {
 		for loc := g.add([2]int{x, y}, g.direction[i]); 0 <= loc[0] && loc[0] < 8 && 0 <= loc[1] && loc[1] < 8; loc = g.add(loc, g.direction[i]) {
 			// fmt.Printf("(%d,%d) %d\n", loc[0], loc[1], g.getPoint(loc))
@@ -284,11 +284,11 @@ func (g *Game) SetRestartFlag(user *User) bool {
 func (g *Game) ResetRestartFlag() {
 	g.restart[0], g.restart[1] = false, false
 }
-func init() {
-	test := Game{Name: "fuck"}
-	test.Init()
-	test.showGame()
-	if test.testMove(2, 2, 0) == true {
-		fmt.Println("so \n")
-	}
-}
+// func init() {
+// 	test := Game{Name: "fuck"}
+// 	test.Init()
+// 	test.showGame()
+// 	if test.testMove(2, 2, 0) == true {
+// 		fmt.Println("so \n")
+// 	}
+// }

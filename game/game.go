@@ -232,6 +232,7 @@ func (g *Game) Leave(someone *User) (*User, bool) {
 	}
 	for index, user := range g.player {
 		if user == someone {
+			someone.GameName=""
 			g.player[index] = nil
 			return g.player[(index+1)%2], true
 		}

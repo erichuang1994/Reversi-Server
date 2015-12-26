@@ -171,11 +171,11 @@ func Join(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	if ok&&user.GameName=="" {
 		game, _ := gameList[cmd[0]]
 		if game.Join(user) {
-			conn.WriteToUDP([]byte("JOIN SUCCESS"), addr)
+			conn.WriteToUDP([]byte("JOIN "+user.GameName+" SUCCESS"), addr)
 			return
 		}
 	}
-	conn.WriteToUDP([]byte("JOIN FAIL"), addr)
+	conn.WriteToUDP([]byte("JOIN "+cmd[0]+" FAIL"), addr)
 
 }
 

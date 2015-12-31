@@ -105,7 +105,7 @@ func Login(conn *net.UDPConn, addr *net.UDPAddr, msg []string) {
 	if len(msg) == 2 {
 		if msg[0] == admin && msg[1] == password {
 			rootToken = genToken(admin)
-			temp := User{Username: msg[0], Addr: addr, LastModified: unixTime(),GameName:""}
+			temp := User{Username: msg[0], Addr: addr, LastModified: unixTime(), GameName: ""}
 			userList[rootToken] = &temp
 			resp = "ROOT " + rootToken
 		} else {
@@ -168,7 +168,7 @@ func List(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 
 func Join(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 	user, ok := userList[cmd[1]]
-	if ok&&user.GameName=="" {
+	if ok && user.GameName == "" {
 		game, _ := gameList[cmd[0]]
 		if game.Join(user) {
 			conn.WriteToUDP([]byte("JOIN "+user.GameName+" SUCCESS"), addr)
@@ -309,7 +309,7 @@ func Watch(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
 }
 
 func Leave(conn *net.UDPConn, addr *net.UDPAddr, cmd []string) {
-	user, ok := userList[cmd[1]]
+	user, ok := userList[cmd[0]]
 	if ok {
 		game, _ := gameList[user.GameName]
 		another, ok := game.Leave(user)

@@ -232,8 +232,9 @@ func (g *Game) Leave(someone *User) (*User, bool) {
 	}
 	for index, user := range g.player {
 		if user == someone {
-			someone.GameName=""
+			someone.GameName = ""
 			g.player[index] = nil
+			g.leisure = true
 			return g.player[(index+1)%2], true
 		}
 	}
@@ -285,6 +286,7 @@ func (g *Game) SetRestartFlag(user *User) bool {
 func (g *Game) ResetRestartFlag() {
 	g.restart[0], g.restart[1] = false, false
 }
+
 // func init() {
 // 	test := Game{Name: "fuck"}
 // 	test.Init()

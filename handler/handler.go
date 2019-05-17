@@ -7,10 +7,11 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"net"
-	. "reversi/game"
 	"strconv"
 	"strings"
 	"time"
+
+	. "github.com/erichuang1994/Reversi-Server/game"
 )
 
 var (

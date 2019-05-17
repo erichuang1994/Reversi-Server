@@ -5,10 +5,11 @@ package main
 import (
 	"fmt"
 	"net"
-	. "reversi/handler"
 	"strings"
 	"sync"
 	"time"
+
+	. "github.com/erichuang1994/Reversi-Server/handler"
 )
 
 type countLock struct {
